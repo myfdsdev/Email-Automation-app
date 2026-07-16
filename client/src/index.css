@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 97.5%;
+    --foreground: 240 12% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 12% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 12% 12%;
+    --primary: 250 70% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 8% 94%;
+    --secondary-foreground: 240 10% 22%;
+    --muted: 240 8% 94%;
+    --muted-foreground: 240 6% 44%;
+    --accent: 250 60% 96%;
+    --accent-foreground: 250 60% 40%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 60% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 44%;
+    --warning-foreground: 0 0% 100%;
+    --info: 214 84% 52%;
+    --info-foreground: 0 0% 100%;
+    --border: 240 8% 89%;
+    --input: 240 8% 85%;
+    --ring: 250 70% 58%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 240 10% 8%;
+    --foreground: 240 8% 93%;
+    --card: 240 8% 11.5%;
+    --card-foreground: 240 8% 93%;
+    --popover: 240 8% 11.5%;
+    --popover-foreground: 240 8% 93%;
+    --primary: 250 75% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 6% 17%;
+    --secondary-foreground: 240 8% 85%;
+    --muted: 240 6% 16%;
+    --muted-foreground: 240 6% 60%;
+    --accent: 250 40% 20%;
+    --accent-foreground: 250 60% 85%;
+    --destructive: 0 62% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 55% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 90% 50%;
+    --warning-foreground: 0 0% 8%;
+    --info: 214 80% 60%;
+    --info-foreground: 0 0% 100%;
+    --border: 240 6% 20%;
+    --input: 240 6% 24%;
+    --ring: 250 75% 65%;
+  }
+
+  * { @apply border-border; }
+  html { -webkit-font-smoothing: antialiased; }
+  body { @apply bg-background text-foreground font-sans text-sm; }
+}
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+}
+
+/* TipTap editor */
+.tiptap { @apply min-h-[180px] px-3 py-2 text-sm outline-none max-w-none; }
+.tiptap p { @apply my-1.5 leading-relaxed; }
+.tiptap ul { @apply list-disc pl-5 my-2; }
+.tiptap ol { @apply list-decimal pl-5 my-2; }
+.tiptap a { @apply text-primary underline; }
+.tiptap h2 { @apply text-lg font-semibold mt-3 mb-1; }
+.tiptap h3 { @apply text-base font-semibold mt-2 mb-1; }
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply text-muted-foreground float-left h-0 pointer-events-none;
+}
+
+/* Email body rendering inside thread view */
+.email-body { @apply text-sm leading-relaxed break-words; }
+.email-body a { @apply text-primary underline; }
+.email-body blockquote { @apply border-l-2 border-border pl-3 text-muted-foreground my-2; }
+.email-body img { max-width: 100%; height: auto; }

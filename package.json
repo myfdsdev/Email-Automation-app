@@ -1,0 +1,19 @@
+{
+  "name": "email-automation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Email Automation - MERN SaaS for Gmail + Brevo outreach, sequences and reply intelligence",
+  "scripts": {
+    "install:all": "npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently -n server,client,worker -c blue,green,magenta \"npm run dev --prefix server\" \"npm run dev --prefix client\" \"npm run dev:worker --prefix server\"",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "dev:worker": "npm run dev:worker --prefix server",
+    "start": "npm run start --prefix server",
+    "start:worker": "npm run start:worker --prefix server",
+    "build": "npm run build --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
