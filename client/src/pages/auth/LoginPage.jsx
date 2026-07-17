@@ -23,7 +23,10 @@ export default function LoginPage() {
   const login = useMutation({
     mutationFn: (values) => post('/auth/login', values),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['me'] });
+      // removeQueries, not invalidateQueries: this page has no ['me'] observer, so
+      // invalidate would only mark the cached 401 stale without refetching it, and the
+      // route guard would then read that stale error and bounce us straight back here.
+      qc.removeQueries({ queryKey: ['me'] });
       toast.success('Welcome back!');
       navigate(location.state?.from || '/dashboard', { replace: true });
     },

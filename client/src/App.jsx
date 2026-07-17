@@ -55,10 +55,14 @@ function useSession() {
 }
 
 function Protected({ children }) {
-  const { isLoading, isError } = useSession();
+  const { isPending, isError, isFetching, data } = useSession();
   const location = useLocation();
-  if (isLoading) return <FullPageSpinner label="Signing you in…" />;
-  if (isError) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+
+  // A 401 from a previous visit stays cached in `isError` while React Query
+  // revalidates on mount. Redirecting on that stale error would bounce a user who
+  // has just signed in back to the login page, so wait for the refetch to settle.
+  if (isPending || (isError && isFetching)) return <FullPageSpinner label="Signing you in…" />;
+  if (isError && !data) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   return children;
 }
 

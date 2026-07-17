@@ -24,7 +24,10 @@ export default function SignupPage() {
   const signup = useMutation({
     mutationFn: (values) => post('/auth/signup', values),
     onSuccess: async (res) => {
-      await qc.invalidateQueries({ queryKey: ['me'] });
+      // removeQueries, not invalidateQueries: the login page has no ['me'] observer,
+      // so invalidate would only mark the cached 401 stale without refetching it, and
+      // the route guard would then read that stale error and bounce us back here.
+      qc.removeQueries({ queryKey: ['me'] });
       toast.success(res.message || 'Account created!');
       navigate('/dashboard', { replace: true });
     },

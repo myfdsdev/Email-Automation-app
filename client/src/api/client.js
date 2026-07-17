@@ -8,6 +8,23 @@ const baseURL = import.meta.env.VITE_API_URL
   ? `${String(import.meta.env.VITE_API_URL).replace(/\/+$/, '')}/api`
   : '/api';
 
+// A cross-origin API is a silent killer here: login returns 200, but the browser
+// refuses to store/send the SameSite=Lax session cookie, so every later request is a
+// 401 and the app bounces back to /login with no visible cause. Say so out loud.
+if (import.meta.env.VITE_API_URL && typeof window !== 'undefined') {
+  try {
+    const apiOrigin = new URL(import.meta.env.VITE_API_URL, window.location.href).origin;
+    if (apiOrigin !== window.location.origin) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[api] VITE_API_URL points at ${apiOrigin} but this page is ${window.location.origin}. ` +
+          'That is a cross-site setup: the auth cookie will be dropped and login will loop back to /login. ' +
+          'Either leave VITE_API_URL blank (same-origin, recommended) or set COOKIE_SAMESITE=none on the API over HTTPS.'
+      );
+    }
+  } catch { /* malformed URL - baseURL will fail loudly on its own */ }
+}
+
 export const api = axios.create({
   baseURL,
   withCredentials: true,
