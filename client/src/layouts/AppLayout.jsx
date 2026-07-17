@@ -44,7 +44,7 @@ function SidebarContent({ collapsed, onNavigate }) {
   const items = NAV.filter((n) => !n.perm || can(role, n.perm));
   return (
     <>
-      <div className={cn('flex h-16 items-center gap-3 border-b px-5 shrink-0', collapsed && 'justify-center px-2')}>
+      <div className={cn('flex h-16 items-center gap-3 border-b border-white/10 px-5 text-white shrink-0', collapsed && 'justify-center px-2')}>
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary shadow-sm">
           <Inbox className="h-4.5 w-4.5 text-primary-foreground" />
         </div>
@@ -60,7 +60,7 @@ function SidebarContent({ collapsed, onNavigate }) {
                 cn(
                   'group flex h-10 w-full items-center rounded-lg text-[14px] font-medium leading-none transition-colors',
                   collapsed ? 'justify-center px-2' : 'justify-start gap-3 px-3',
-                  isActive ? 'bg-primary/10 text-primary shadow-sm' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  isActive ? 'bg-white/10 text-white shadow-sm' : 'text-white/80 hover:bg-white/10 hover:text-white'
                 )
               }
             >
@@ -71,7 +71,7 @@ function SidebarContent({ collapsed, onNavigate }) {
         ))}
         {user?.isPlatformAdmin && (
           <>
-            <Separator className="my-2" />
+            <Separator className="my-2 bg-white/10" />
             <Tip content={collapsed ? 'Admin Panel' : null} side="right">
               <NavLink
                 to="/admin"
@@ -80,7 +80,7 @@ function SidebarContent({ collapsed, onNavigate }) {
                   cn(
                     'group flex h-10 w-full items-center rounded-lg text-[14px] font-medium leading-none transition-colors',
                     collapsed ? 'justify-center px-2' : 'justify-start gap-3 px-3',
-                    isActive ? 'bg-primary/10 text-primary shadow-sm' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                    isActive ? 'bg-white/10 text-white shadow-sm' : 'text-white/80 hover:bg-white/10 hover:text-white'
                   )
                 }
               >
@@ -101,7 +101,7 @@ function UsageWidget({ collapsed }) {
   if (collapsed || !data) return null;
   const emails = data.usage?.emails_sent;
   return (
-    <div className="border-t p-4 shrink-0">
+    <div className="border-t border-white/10 p-4 text-white shrink-0">
       <div className="mb-2.5 flex items-center justify-between gap-3">
         <span className="flex min-w-0 items-center gap-2 text-[13px] font-semibold leading-none">
           <Gauge className="h-4 w-4 shrink-0" />
@@ -110,7 +110,7 @@ function UsageWidget({ collapsed }) {
         <Badge variant="secondary" className="shrink-0 text-[10px]">{titleCase(data.plan)}</Badge>
       </div>
       <Progress value={emails?.used || 0} max={emails?.limit || 1} className="h-2" />
-      <p className="mt-2 text-[12px] leading-none text-muted-foreground">
+      <p className="mt-2 text-[12px] leading-none text-white/70">
         {(emails?.used || 0).toLocaleString()} / {(emails?.limit || 0).toLocaleString()} sent
       </p>
     </div>
@@ -293,7 +293,7 @@ export default function AppLayout() {
     <TooltipProvider>
       <div className="flex h-screen overflow-hidden">
         {/* Desktop sidebar */}
-        <aside className={cn('hidden lg:flex flex-col border-r bg-card transition-[width] duration-200 shrink-0', sidebarCollapsed ? 'w-[68px]' : 'w-[260px]')}>
+        <aside className={cn('hidden lg:flex flex-col border-r border-slate-800 bg-[#18181d] transition-[width] duration-200 shrink-0', sidebarCollapsed ? 'w-[68px]' : 'w-[260px]')}>
           <SidebarContent collapsed={sidebarCollapsed} />
         </aside>
 
@@ -301,8 +301,8 @@ export default function AppLayout() {
         {mobileOpen && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-            <aside className="absolute left-0 top-0 h-full w-[280px] bg-card border-r flex flex-col animate-fade-in">
-              <Button variant="ghost" size="icon" className="absolute right-2 top-2.5 z-10" onClick={() => setMobileOpen(false)}><X /></Button>
+            <aside className="absolute left-0 top-0 h-full w-[280px] border-r border-slate-800 bg-[#18181d] flex flex-col animate-fade-in">
+              <Button variant="ghost" size="icon" className="absolute right-2 top-2.5 z-10 text-white hover:bg-white/10 hover:text-white" onClick={() => setMobileOpen(false)}><X /></Button>
               <SidebarContent collapsed={false} onNavigate={() => setMobileOpen(false)} />
             </aside>
           </div>
