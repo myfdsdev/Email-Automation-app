@@ -67,10 +67,25 @@ Only needed if you want Gmail features.
 2. OAuth consent screen → External. While in *Testing*, only listed test users can connect, and refresh tokens expire after 7 days — **publish the app** before real use.
 3. Credentials → OAuth client ID → Web application:
    - **Authorized JavaScript origins**: `https://<your-web-url>`
-   - **Authorized redirect URIs**: `https://<your-web-url>/api/integrations/gmail/callback`
+   - **Authorized redirect URIs** — add **both**, they are different flows:
+     - `https://<your-api-url>/api/integrations/gmail/callback` — Gmail integration (mailbox access)
+     - `https://<your-api-url>/api/auth/google/callback` — "Sign in with Google" (authentication)
 
-   This must match byte for byte, including the scheme and no trailing slash.
+   These must match byte for byte, including the scheme and no trailing slash. Use the
+   **API's** URL, not the frontend's — the callback is handled by Express.
 4. Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in the shared env group.
+
+### Sign in with Google
+The button on the login/signup pages links to `GET /api/auth/google`, which redirects to
+Google and returns to `/api/auth/google/callback`. Notes:
+- It requests only `openid email profile` — no mailbox scopes and no refresh token. It
+  authenticates; it does not connect Gmail. Users still connect Gmail separately under
+  Integrations.
+- An account is only created or linked when Google reports `email_verified`, which is
+  what makes linking a Google identity to an existing local account safe.
+- The callback runs on the API's origin, so the session cookie is set first-party there
+  and then works cross-site — provided `COOKIE_SAMESITE=none` in a split deploy.
+- Leave `GOOGLE_LOGIN_REDIRECT_URI` unset to derive it from `RENDER_EXTERNAL_URL`.
 
 The server boots-checks this: if `GOOGLE_CLIENT_ID` is set but the redirect URI still points at localhost, it fails fast rather than breaking at the end of the consent flow.
 

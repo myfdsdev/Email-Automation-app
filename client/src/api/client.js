@@ -31,6 +31,18 @@ export const api = axios.create({
   timeout: 60000,
 });
 
+/**
+ * Absolute URL for a browser navigation to an API endpoint (OAuth redirects).
+ * XHR can use the relative baseURL, but window.location must resolve to the API's
+ * real origin, which differs from the page origin in a split deploy.
+ */
+export const apiHref = (path) => {
+  const base = import.meta.env.VITE_API_URL
+    ? `${String(import.meta.env.VITE_API_URL).replace(/\/+$/, '')}/api`
+    : `${window.location.origin}/api`;
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+};
+
 api.interceptors.request.use((config) => {
   const wid = useAuthStore.getState().activeWorkspaceId;
   if (wid) config.headers['X-Workspace-Id'] = wid;

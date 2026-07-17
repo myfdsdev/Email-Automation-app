@@ -32,9 +32,16 @@ export const env = {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     // Must byte-for-byte match an Authorized redirect URI in the Google Cloud console.
+    // Gmail *integration* callback: grants mailbox access for an already-signed-in user.
     redirectUri:
       process.env.GOOGLE_REDIRECT_URI ||
       (platformUrl ? `${platformUrl}/api/integrations/gmail/callback` : 'http://localhost:5000/api/integrations/gmail/callback'),
+    // "Sign in with Google" callback: authentication only (openid/email/profile).
+    // Deliberately a separate URI from the Gmail one — different scopes, different
+    // meaning, and Google matches redirect URIs exactly. Both must be registered.
+    loginRedirectUri:
+      process.env.GOOGLE_LOGIN_REDIRECT_URI ||
+      (platformUrl ? `${platformUrl}/api/auth/google/callback` : 'http://localhost:5000/api/auth/google/callback'),
     pubsubTopic: process.env.GOOGLE_PUBSUB_TOPIC || '',
     pubsubSubscription: process.env.GOOGLE_PUBSUB_SUBSCRIPTION || '',
   },
@@ -113,6 +120,9 @@ if (env.isProd) {
   // breaks the Gmail connect flow at the final redirect with an opaque error.
   if (env.google.clientId && /localhost|127\.0\.0\.1/.test(env.google.redirectUri)) {
     errors.push(`GOOGLE_REDIRECT_URI points at localhost (${env.google.redirectUri}). Set it to https://<your-domain>/api/integrations/gmail/callback and register that exact URI in the Google Cloud console.`);
+  }
+  if (env.google.clientId && /localhost|127\.0\.0\.1/.test(env.google.loginRedirectUri)) {
+    errors.push(`GOOGLE_LOGIN_REDIRECT_URI points at localhost (${env.google.loginRedirectUri}). Set it to https://<your-domain>/api/auth/google/callback and register that exact URI in the Google Cloud console.`);
   }
 
   const weak = ['dev-access-secret-change-me', 'dev-refresh-secret-change-me', 'dev-cookie-secret-change-me'];

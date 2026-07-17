@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { post } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Field } from '@/components/shared';
+import { Field, GoogleAuthButton, AuthDivider } from '@/components/shared';
 
 const schema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -40,6 +40,8 @@ export default function SignupPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Create your account</h1>
         <p className="text-muted-foreground text-[13px] mt-1">Free plan includes 500 contacts and 1,000 emails per month.</p>
       </div>
+      <GoogleAuthButton label="Sign up with Google" />
+      <AuthDivider label="or sign up with email" />
       <form onSubmit={handleSubmit((v) => signup.mutate(v))} className="space-y-4" noValidate>
         <Field label="Full name" required error={errors.name}>
           <Input placeholder="Alex Morgan" autoComplete="name" {...register('name')} />

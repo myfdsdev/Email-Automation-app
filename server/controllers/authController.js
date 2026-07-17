@@ -11,6 +11,14 @@ import { signAccessToken, createRefreshToken, hashRefreshToken, setAuthCookies, 
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/mailerService.js';
 import { audit } from '../services/auditService.js';
 import { logger } from '../utils/logger.js';
+import { env } from '../config/env.js';
+import {
+  isGoogleLoginConfigured,
+  createState,
+  verifyState,
+  getLoginUrl,
+  exchangeCodeForProfile,
+} from '../integrations/google/googleLoginClient.js';
 
 function slugify(name) {
   return `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)}-${crypto.randomBytes(3).toString('hex')}`;
@@ -67,6 +75,13 @@ export const signup = catchAsync(async (req, res) => {
 export const login = catchAsync(async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email }).select('+password');
+
+  // A Google-only account has no password hash. Say so instead of returning a generic
+  // "incorrect password" the user could never satisfy.
+  if (user && !user.password && user.googleId) {
+    throw ApiError.badRequest('This account uses Google sign-in. Use the "Continue with Google" button.', 'USE_GOOGLE_SIGNIN');
+  }
+
   if (!user || !(await user.comparePassword(password))) {
     throw ApiError.unauthorized('Incorrect email or password.', 'INVALID_CREDENTIALS');
   }
@@ -74,6 +89,79 @@ export const login = catchAsync(async (req, res) => {
   await issueSession(res, user, req);
   await audit({ ...req, user }, 'auth.login');
   return ok(res, { user: user.toSafeJSON() }, 'Welcome back.');
+});
+
+/* ------------------------------ Google sign-in ----------------------------- */
+
+/** Sends the browser to Google's consent screen. This is a top-level navigation, not XHR. */
+export const googleAuthStart = catchAsync(async (req, res) => {
+  if (!isGoogleLoginConfigured()) {
+    return res.redirect(`${env.clientUrl}/login?error=google_not_configured`);
+  }
+  const state = createState({ next: typeof req.query.next === 'string' ? req.query.next : null });
+  return res.redirect(getLoginUrl(state));
+});
+
+/**
+ * Google redirects the browser back here. We are on the API's own origin at this
+ * moment, so the session cookie is set first-party and works afterwards even when
+ * the SPA lives on another domain (given COOKIE_SAMESITE=none).
+ */
+export const googleCallback = catchAsync(async (req, res) => {
+  const fail = (reason) => res.redirect(`${env.clientUrl}/login?error=${encodeURIComponent(reason)}`);
+
+  if (req.query.error) return fail(String(req.query.error));
+  if (!req.query.code || !req.query.state) return fail('missing_code');
+
+  let next = null;
+  try {
+    next = verifyState(req.query.state)?.next || null;
+  } catch {
+    return fail('invalid_state');
+  }
+
+  let profile;
+  try {
+    profile = await exchangeCodeForProfile(String(req.query.code));
+  } catch (err) {
+    logger.warn(`Google sign-in exchange failed: ${err.message}`);
+    return fail('google_exchange_failed');
+  }
+
+  if (!profile.email) return fail('no_email');
+  // Linking by email is only safe because Google asserts ownership. Without this an
+  // unverified Google account could be used to take over a local account by email.
+  if (!profile.emailVerified) return fail('email_not_verified');
+
+  let user = await User.findOne({ $or: [{ googleId: profile.googleId }, { email: profile.email }] });
+  let workspace = null;
+
+  if (!user) {
+    user = new User({
+      name: profile.name,
+      email: profile.email,
+      googleId: profile.googleId,
+      isEmailVerified: true,
+      avatarUrl: profile.picture,
+    });
+    workspace = await createWorkspaceForUser(user, `${String(profile.name).split(' ')[0]}'s Workspace`);
+    user.defaultWorkspace = workspace._id;
+    await user.save();
+    await WorkspaceMember.updateMany({ email: profile.email, status: 'invited' }, { $set: { userId: user._id } });
+    await audit({ ...req, workspaceId: workspace._id, user }, 'auth.signup_google');
+  } else {
+    // Existing local account signing in with Google for the first time: link them.
+    if (!user.googleId) user.googleId = profile.googleId;
+    if (!user.isEmailVerified) user.isEmailVerified = true;
+    if (!user.avatarUrl && profile.picture) user.avatarUrl = profile.picture;
+    await audit({ ...req, user }, 'auth.login_google');
+  }
+
+  if (!user.isActive) return fail('account_disabled');
+
+  await issueSession(res, user, req);
+  const dest = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+  return res.redirect(`${env.clientUrl}${dest}`);
 });
 
 export const refresh = catchAsync(async (req, res) => {

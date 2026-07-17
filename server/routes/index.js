@@ -35,6 +35,10 @@ router.post('/webhooks/calling/outcome', requireAuth, requireWorkspace, validate
 /* ---------------- auth ---------------- */
 router.post('/auth/signup', authLimiter, validate({ body: v.signupSchema }), auth.signup);
 router.post('/auth/login', authLimiter, validate({ body: v.loginSchema }), auth.login);
+// Browser navigations (not XHR): the button links straight here, and the callback
+// redirects back to the SPA with a session cookie already set.
+router.get('/auth/google', authLimiter, auth.googleAuthStart);
+router.get('/auth/google/callback', auth.googleCallback);
 router.post('/auth/logout', auth.logout);
 router.post('/auth/refresh', auth.refresh);
 router.post('/auth/forgot-password', authLimiter, validate({ body: v.forgotSchema }), auth.forgotPassword);
