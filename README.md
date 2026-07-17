@@ -211,7 +211,7 @@ The web process never runs heavy jobs when Redis is configured. Repeatable jobs:
 
 `/api/auth` `/api/users` `/api/workspaces` `/api/team` `/api/integrations/gmail` `/api/integrations/brevo` `/api/contacts` (+`/import`) `/api/contact-lists` `/api/segments` `/api/templates` `/api/campaigns` `/api/sequences` `/api/automations` `/api/inbox` `/api/email-messages` `/api/appointments` `/api/follow-ups` `/api/suppression` `/api/notifications` `/api/ai` `/api/search` `/api/analytics` `/api/billing` `/api/admin` `/api/webhooks/{brevo,gmail,calling}`
 
-All responses use `{ success, message, data }`; errors add `code` and `details`. Auth uses a 15-minute access token + 30-day rotating refresh token, both HTTP-only cookies (`SameSite=Strict` + `Secure` in production).
+All responses use `{ success, message, data }`; errors add `code` and `details`. Auth uses a 15-minute access token + 30-day rotating refresh token, both HTTP-only cookies (`SameSite=Lax` + `Secure` in production; set `COOKIE_SAMESITE=none` for split-domain deploys).
 
 ### Calling-app integration
 
@@ -230,13 +230,21 @@ db.users.updateOne({ email: 'you@company.com' }, { $set: { isPlatformAdmin: true
 
 ## Production deployment
 
-1. **Provision**: MongoDB (Atlas), Redis (Upstash/ElastiCache), two Node services (web + worker), static hosting or the same web service for the client build.
-2. **Build client**: `npm run build --prefix client` → serve `client/dist` behind your CDN/reverse proxy; proxy `/api` to the web service.
-3. **Web service**: `NODE_ENV=production RUN_WORKERS=false node server/server.js`
-4. **Worker service**: `NODE_ENV=production RUN_WORKERS=true node worker/worker.js`
-5. Set `CLIENT_URL`/`API_URL` to your HTTPS domains (CORS allowlist + cookies depend on them), update the Google redirect URI and Brevo webhook URL.
-6. Put the API behind TLS; cookies are `Secure` + `SameSite=Strict` in production.
-7. Scale workers horizontally as sending volume grows — idempotency keys make this safe.
+**→ Full step-by-step guide: [DEPLOYMENT.md](DEPLOYMENT.md)**
+
+This repo ships a Render Blueprint ([`render.yaml`](render.yaml)): push to GitHub, then Render → **New** → **Blueprint**. It provisions a web service (API + SPA on one origin) and a background worker, sharing secrets through an env group so both agree on the JWT and credential-encryption keys. MongoDB (Atlas) and Redis (Upstash/Redis Cloud) are managed externally — you supply `MONGODB_URI` and a `rediss://` `REDIS_URL`.
+
+The essentials, if you are deploying somewhere else:
+
+1. **Build client**: `npm run build --prefix client`. The API serves `client/dist` automatically when `NODE_ENV=production` (disable with `SERVE_CLIENT=false` if a CDN serves it).
+2. **Web service**: `NODE_ENV=production RUN_WORKERS=false npm start`
+3. **Worker service**: `NODE_ENV=production RUN_WORKERS=true npm run start:worker`
+4. **Build indexes before taking traffic**: `npm run db:indexes`. `autoIndex` is off in production, and unique indexes are what enforce duplicate-send prevention and per-workspace contact uniqueness.
+5. Set `CLIENT_URL`/`API_URL` to your HTTPS domain (CORS + email links depend on them) and update the Google redirect URI and Brevo webhook URL. On Render these derive from `RENDER_EXTERNAL_URL` automatically.
+6. Cookies are `Secure` + `SameSite=Lax` in production, which works same-origin and keeps the Gmail OAuth return redirect intact. Split-domain deploys need `COOKIE_SAMESITE=none` plus `VITE_API_URL` at build time.
+7. Scale workers horizontally as sending volume grows — idempotency keys make this safe. Note the web service's rate limiter is in-memory, so scale that out only after moving it to a Redis store.
+
+The server validates its own production config at boot and refuses to start on a missing/malformed encryption key, a missing `REDIS_URL`, a localhost `CLIENT_URL`, or default dev secrets.
 
 ### Security checklist (implemented)
 
