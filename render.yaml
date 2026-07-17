@@ -73,6 +73,10 @@ services:
     region: oregon
     branch: main
     buildCommand: npm run render:build:web
+    # Builds the schema indexes before the new version takes traffic. Required because
+    # autoIndex is off in production, and this schema uses unique indexes to enforce
+    # correctness (duplicate-send prevention, per-workspace contact uniqueness).
+    preDeployCommand: npm run db:indexes
     startCommand: npm run start
     healthCheckPath: /health
     autoDeploy: true

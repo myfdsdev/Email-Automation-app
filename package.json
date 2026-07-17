@@ -12,6 +12,7 @@
     "//render": "Render sets NODE_ENV=production, which makes npm ci omit devDependencies. Vite is a devDependency, so the client install must force --include=dev or the build fails.",
     "render:build:web": "npm ci --omit=dev --prefix server && npm ci --include=dev --prefix client && npm run build --prefix client",
     "render:build:worker": "npm ci --omit=dev --prefix server",
+    "db:indexes": "npm run db:indexes --prefix server",
 
     "dev": "concurrently -n server,client,worker -c blue,green,magenta \"npm run dev --prefix server\" \"npm run dev --prefix client\" \"npm run dev:worker --prefix server\"",
     "dev:server": "npm run dev --prefix server",
