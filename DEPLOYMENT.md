@@ -112,7 +112,15 @@ Then check, in order:
 
 **The client bundle is ~1.6 MB (~470 KB gzipped)** in one chunk. It works, but first load is heavier than it should be — route-level code splitting is the obvious follow-up.
 
-**Migrations.** Mongoose builds indexes automatically only when `autoIndex` is on, and it is **disabled in production** (see `server/config/db.js`). Indexes created by a fresh deploy against an empty Atlas database will not exist. Either run one deploy with `autoIndex` enabled, or create indexes manually via `Model.syncIndexes()` before serious traffic.
+**Indexes are built by a pre-deploy step, not at boot.** `autoIndex` is off in production (auto-building on every boot can stall a busy cluster), so the blueprint runs `npm run db:indexes` as the web service's `preDeployCommand`. That matters for correctness, not just speed: this schema enforces duplicate-send prevention (`EmailMessage.idempotencyKey`) and per-workspace contact uniqueness (`Contact{workspaceId,email}`) with unique indexes. If that step is skipped against a fresh database, those guarantees silently do not hold.
+
+You can run it by hand at any time — it is idempotent:
+
+```bash
+npm run db:indexes
+```
+
+Be aware `syncIndexes()` drops indexes that exist in the database but not in the schema, so hand-created indexes will be removed.
 
 ### Custom domain
 Add the domain in Render, then override in the web service:
