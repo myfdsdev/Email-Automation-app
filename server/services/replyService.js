@@ -3,7 +3,7 @@ import { SequenceEnrollment } from '../models/SequenceEnrollment.js';
 import { EmailSequence } from '../models/EmailSequence.js';
 import { EmailCampaign } from '../models/EmailCampaign.js';
 import { EmailThread } from '../models/EmailThread.js';
-import { classifyReply } from './aiService.js';
+import { classifyReply, isAiConfigured } from './aiService.js';
 import { suppressContact } from './suppressionService.js';
 import { notify } from './notificationService.js';
 import { recordEvent } from './emailSendService.js';
@@ -149,7 +149,7 @@ export async function handleIncomingReply({ connection, message, thread, contact
   try {
     const workspace = await Workspace.findById(workspaceId);
     const wantsDraft = analysis.requiresHumanReply && !analysis.outOfOffice && !analysis.unsubscribeRequest;
-    if (wantsDraft && process.env.OPENAI_API_KEY) {
+    if (wantsDraft && isAiConfigured()) {
       const gen = await generateContent(workspaceId, 'reply', {
         prompt: 'Draft a reply to this prospect email.',
         context: {

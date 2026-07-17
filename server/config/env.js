@@ -63,9 +63,12 @@ export const env = {
   redisUrl: process.env.REDIS_URL || '',
   runWorkers: bool(process.env.RUN_WORKERS),
 
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY || '',
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  // Google Gemini powers the AI features (reply classification, drafting, rewrites).
+  // Without a key the app still runs: classification falls back to the regex
+  // heuristics in aiService.js, and the generation endpoints return 503.
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || '',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
   },
 
   stripe: {

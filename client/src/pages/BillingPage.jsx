@@ -45,7 +45,7 @@ export default function BillingPage() {
 
   return (
     <Page>
-      <PageHeader title="Billing & Usage" description="Your plan, usage limits and billing history. Provider costs (Brevo, OpenAI) are billed by those providers directly." />
+      <PageHeader title="Billing & Usage" description="Your plan, usage limits and billing history. Provider costs (Brevo, Gemini) are billed by those providers directly." />
 
       {billingQ.isLoading ? <Skeleton className="h-64 w-full" /> : data && (
         <>

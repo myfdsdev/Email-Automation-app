@@ -59,7 +59,11 @@ envVarGroups:
         sync: false
       - key: BREVO_WEBHOOK_SECRET
         sync: false
-      - key: OPENAI_API_KEY
+      # Gemini powers the AI features. Optional: without it, reply classification
+      # falls back to heuristics. Get one at https://aistudio.google.com/apikey
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
         sync: false
       - key: STRIPE_SECRET_KEY
         sync: false

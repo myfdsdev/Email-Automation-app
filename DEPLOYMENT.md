@@ -53,7 +53,9 @@ This is `EMAIL_CREDENTIAL_ENCRYPTION_KEY`, and it must be **exactly 64 hex chara
 
    `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` and `COOKIE_SECRET` are generated once by Render and shared across both services — leave them alone.
 
-   Integration keys (`GOOGLE_*`, `BREVO_WEBHOOK_SECRET`, `OPENAI_API_KEY`, `STRIPE_*`, `SMTP_*`) are optional. Leave any blank to run without that feature.
+   Integration keys (`GOOGLE_*`, `BREVO_WEBHOOK_SECRET`, `GEMINI_API_KEY`, `STRIPE_*`, `SMTP_*`) are optional. Leave any blank to run without that feature.
+
+   `GEMINI_API_KEY` (from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)) powers reply classification and AI drafting. It is a **Gemini API key, not an OAuth credential** — unrelated to `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, despite both being Google. Without it, replies are classified by regex heuristics and AI generation returns 503.
 
 4. Apply. First build takes ~3–5 minutes (it installs both packages and builds the SPA).
 

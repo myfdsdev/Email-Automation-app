@@ -16,7 +16,7 @@ User Signup → Create Workspace → Connect Gmail → Connect Brevo → Import 
 | Frontend | React 18, Vite, Tailwind CSS, shadcn-style UI on Radix primitives, TanStack Query, React Hook Form + Zod, Zustand, Recharts, TipTap, Axios, Lucide |
 | Backend | Node.js, Express 4, MongoDB + Mongoose, JWT (HTTP-only cookies), bcrypt, Zod, Helmet, CORS allowlist, rate limiting, mongo-sanitize, Multer, Nodemailer |
 | Background | Redis + BullMQ, dedicated worker process (`worker/worker.js`), inline dev fallback when Redis is absent |
-| Integrations | Gmail API (OAuth 2.0 + Pub/Sub push), Brevo v3 API + webhooks, OpenAI-compatible AI (optional), Stripe-ready billing |
+| Integrations | Gmail API (OAuth 2.0 + Pub/Sub push), Sign in with Google, Brevo v3 API + webhooks, Google Gemini AI (optional), Stripe-ready billing |
 
 ## Repository layout
 
@@ -167,7 +167,8 @@ Webhook processing is **idempotent** (unique event ids + event-level dedupe keys
 ## Optional providers
 
 ```env
-OPENAI_API_KEY=sk-...        # AI generation + reply classification (heuristic fallback without it)
+GEMINI_API_KEY=...           # AI generation + reply classification (heuristic fallback without it)
+GEMINI_MODEL=gemini-2.5-flash # optional; this is the default
 STRIPE_SECRET_KEY=sk_...     # billing (plan changes work without Stripe in self-hosted mode)
 SMTP_HOST=...                # system mail (verification/reset). Logged to console in dev if unset.
 ```

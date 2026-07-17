@@ -3,22 +3,73 @@ import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { incrementUsage, assertWithinLimit } from './usageService.js';
 
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-async function chat(messages, { json = false, maxTokens = 700 } = {}) {
-  if (!env.openai.apiKey) return null;
-  const { data } = await axios.post(
-    OPENAI_URL,
-    {
-      model: env.openai.model,
-      messages,
-      temperature: 0.4,
-      max_tokens: maxTokens,
-      ...(json ? { response_format: { type: 'json_object' } } : {}),
-    },
-    { headers: { Authorization: `Bearer ${env.openai.apiKey}` }, timeout: 30000 }
-  );
-  return data.choices?.[0]?.message?.content ?? null;
+export function isAiConfigured() {
+  return !!env.gemini.apiKey;
+}
+
+/**
+ * Single call into Gemini. Unlike the OpenAI chat format, Gemini takes the system
+ * prompt out-of-band (`system_instruction`) rather than as a message role.
+ *
+ * `responseMimeType: application/json` is Gemini's JSON mode: it constrains decoding
+ * so the response parses, instead of relying on the prompt to ask for clean JSON.
+ */
+async function chat({ system, user, json = false, maxTokens = 700 }) {
+  if (!env.gemini.apiKey) return null;
+
+  const url = `${GEMINI_BASE}/${encodeURIComponent(env.gemini.model)}:generateContent`;
+
+  // Gemini 2.5 models reason before answering, and those thinking tokens are charged
+  // against maxOutputTokens. With our small budgets (300 for classification) thinking
+  // can consume the whole allowance and return an empty candidate with
+  // finishReason=MAX_TOKENS. These are constrained, schema-shaped tasks that gain
+  // nothing from it, so disable it. The field only exists on 2.5 models — sending it
+  // to 2.0 is rejected as an unknown argument.
+  const isThinkingModel = /2\.5/.test(env.gemini.model);
+
+  let data;
+  try {
+    ({ data } = await axios.post(
+      url,
+      {
+        ...(system ? { system_instruction: { parts: [{ text: system }] } } : {}),
+        contents: [{ role: 'user', parts: [{ text: user }] }],
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: maxTokens,
+          ...(isThinkingModel ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+          ...(json ? { responseMimeType: 'application/json' } : {}),
+        },
+      },
+      {
+        // Key travels in a header, never the query string, so it cannot leak via
+        // request logs or error URLs.
+        headers: { 'x-goog-api-key': env.gemini.apiKey, 'Content-Type': 'application/json' },
+        timeout: 30000,
+      }
+    ));
+  } catch (err) {
+    // Surface Gemini's own reason (bad key, quota, model not found) rather than a
+    // bare "Request failed with status code 400".
+    const reason = err.response?.data?.error?.message || err.message;
+    throw new Error(`Gemini request failed: ${reason}`);
+  }
+
+  const candidate = data.candidates?.[0];
+  // A safety block or token exhaustion yields a candidate with no parts.
+  if (!candidate || !candidate.content?.parts?.length) {
+    const why = candidate?.finishReason || data.promptFeedback?.blockReason || 'no content returned';
+    throw new Error(`Gemini returned no usable content (${why}).`);
+  }
+  return candidate.content.parts.map((p) => p.text || '').join('').trim() || null;
+}
+
+/** JSON mode should return bare JSON, but strip stray code fences defensively. */
+function parseJson(text) {
+  const cleaned = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+  return JSON.parse(cleaned);
 }
 
 /* ---------------- Reply classification ---------------- */
@@ -67,23 +118,19 @@ export function classifyReplyHeuristic(text) {
 
 export async function classifyReply(workspaceId, { subject, body, contactName }) {
   const heuristic = classifyReplyHeuristic(`${subject}\n${body}`);
-  if (!env.openai.apiKey) return heuristic;
+  if (!env.gemini.apiKey) return heuristic;
 
   try {
     await assertWithinLimit(workspaceId, 'ai_analyses');
-    const content = await chat(
-      [
-        {
-          role: 'system',
-          content:
-            'You classify sales email replies. Respond ONLY with JSON: {"classification": one of [interested, pricing_question, more_information, meeting_request, not_interested, unsubscribe, out_of_office, wrong_contact, referral, complaint, support_request, automatic_reply, spam], "sentiment": "positive"|"neutral"|"negative", "intent": short_snake_case, "requiresHumanReply": bool, "unsubscribeRequest": bool, "outOfOffice": bool, "summary": one sentence, "suggestedAction": one of [send_booking_link, send_pricing, send_information, suppress_contact, review_reply, schedule_call, update_contact]}',
-        },
-        { role: 'user', content: `From: ${contactName || 'contact'}\nSubject: ${subject || ''}\n\n${String(body || '').slice(0, 6000)}` },
-      ],
-      { json: true, maxTokens: 300 }
-    );
+    const content = await chat({
+      system:
+        'You classify sales email replies. Respond ONLY with JSON: {"classification": one of [interested, pricing_question, more_information, meeting_request, not_interested, unsubscribe, out_of_office, wrong_contact, referral, complaint, support_request, automatic_reply, spam], "sentiment": "positive"|"neutral"|"negative", "intent": short_snake_case, "requiresHumanReply": bool, "unsubscribeRequest": bool, "outOfOffice": bool, "summary": one sentence, "suggestedAction": one of [send_booking_link, send_pricing, send_information, suppress_contact, review_reply, schedule_call, update_contact]}',
+      user: `From: ${contactName || 'contact'}\nSubject: ${subject || ''}\n\n${String(body || '').slice(0, 6000)}`,
+      json: true,
+      maxTokens: 300,
+    });
     await incrementUsage(workspaceId, 'ai_analyses');
-    const parsed = JSON.parse(content);
+    const parsed = parseJson(content);
     // Never let the model un-flag an explicit unsubscribe caught by heuristics.
     if (heuristic.unsubscribeRequest) {
       parsed.unsubscribeRequest = true;
@@ -114,20 +161,19 @@ const GEN_MODES = {
 export async function generateContent(workspaceId, mode, { prompt, context }) {
   const instruction = GEN_MODES[mode];
   if (!instruction) throw new Error(`Unknown AI mode: ${mode}`);
-  if (!env.openai.apiKey) {
-    const e = new Error('AI is not configured. Add OPENAI_API_KEY on the server to enable AI features.');
+  if (!env.gemini.apiKey) {
+    const e = new Error('AI is not configured. Add GEMINI_API_KEY on the server to enable AI features.');
     e.statusCode = 503;
     e.code = 'AI_NOT_CONFIGURED';
     throw e;
   }
   await assertWithinLimit(workspaceId, 'ai_generations');
-  const content = await chat(
-    [
-      { role: 'system', content: `You are an expert email copywriter for B2B sales. ${instruction} Do not include markdown fences.` },
-      { role: 'user', content: `${prompt || ''}\n\nContext:\n${JSON.stringify(context || {}).slice(0, 4000)}` },
-    ],
-    { json: true, maxTokens: 800 }
-  );
+  const content = await chat({
+    system: `You are an expert email copywriter for B2B sales. ${instruction} Do not include markdown fences.`,
+    user: `${prompt || ''}\n\nContext:\n${JSON.stringify(context || {}).slice(0, 4000)}`,
+    json: true,
+    maxTokens: 800,
+  });
   await incrementUsage(workspaceId, 'ai_generations');
-  return JSON.parse(content);
+  return parseJson(content);
 }
