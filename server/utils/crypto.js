@@ -7,7 +7,12 @@ function getKey() {
   if (env.encryptionKey && /^[0-9a-f]{64}$/i.test(env.encryptionKey)) {
     return Buffer.from(env.encryptionKey, 'hex');
   }
-  // Dev fallback: derive a stable key from cookie secret. Production requires a real key (enforced in env.js).
+  // env.js rejects a missing/malformed key at boot in production; this guards against
+  // ever encrypting real credentials under the derived dev key if that check regresses.
+  if (env.isProd) {
+    throw new Error('EMAIL_CREDENTIAL_ENCRYPTION_KEY is missing or malformed (expected 64 hex characters).');
+  }
+  // Dev fallback: derive a stable key from the cookie secret so local runs work unconfigured.
   return crypto.createHash('sha256').update(`ea-dev-${env.cookieSecret}`).digest();
 }
 

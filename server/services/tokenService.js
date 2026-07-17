@@ -19,11 +19,27 @@ export function hashRefreshToken(token) {
   return sha256(token);
 }
 
+/**
+ * 'lax' is the production default rather than 'strict' for two reasons:
+ *  - the Gmail OAuth callback returns via a cross-site top-level redirect, and 'strict'
+ *    withholds the cookie on that navigation, landing the user back on the login screen;
+ *  - it keeps same-origin deploys (server serving the SPA) working out of the box.
+ * Cross-site deploys (SPA and API on different domains) must set COOKIE_SAMESITE=none,
+ * which browsers only accept on Secure cookies.
+ */
+const sameSite = env.cookieSameSite || (env.isProd ? 'lax' : 'lax');
+const secure = env.isProd || sameSite === 'none';
+
+if (sameSite === 'none' && !secure) {
+  throw new Error('COOKIE_SAMESITE=none requires HTTPS (Secure cookies).');
+}
+
 const base = {
   httpOnly: true,
-  secure: env.isProd,
-  sameSite: env.isProd ? 'strict' : 'lax',
+  secure,
+  sameSite,
   path: '/',
+  ...(env.cookieDomain ? { domain: env.cookieDomain } : {}),
 };
 
 export function setAuthCookies(res, accessToken, refreshToken) {

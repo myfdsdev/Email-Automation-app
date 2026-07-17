@@ -1,0 +1,121 @@
+# Render Blueprint - Email Automation
+# Deploy: Render Dashboard -> New -> Blueprint -> pick this repo.
+#
+# Topology
+#   web    : Express API + the built React SPA on one origin (no CORS, no cross-site cookies)
+#   worker : BullMQ background processor (sending, sequences, Gmail sync, webhooks)
+#
+# Datastores are managed and live outside this blueprint:
+#   MONGODB_URI -> MongoDB Atlas
+#   REDIS_URL   -> Upstash / Redis Cloud (use the rediss:// TLS URL)
+#
+# Secrets in `email-automation-shared` are generated ONCE and injected into both
+# services. This is deliberate: web and worker must agree on the JWT and credential
+# encryption keys, and per-service generateValue would mint different values, leaving
+# the worker unable to decrypt the Gmail tokens the web service stored.
+
+envVarGroups:
+  - name: email-automation-shared
+    envVars:
+      # --- generated once by Render, shared by both services ---
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: COOKIE_SECRET
+        generateValue: true
+
+      # --- you must supply these (Render prompts on first deploy) ---
+      # Must be 64 hex chars. Generate:
+      #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      # Treat like a root password: if lost, every stored Gmail/Brevo credential
+      # becomes undecryptable and integrations must be reconnected.
+      - key: EMAIL_CREDENTIAL_ENCRYPTION_KEY
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: REDIS_URL
+        sync: false
+
+      # --- integrations (optional; leave blank to disable that feature) ---
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_PUBSUB_TOPIC
+        sync: false
+      - key: GOOGLE_PUBSUB_SUBSCRIPTION
+        sync: false
+      - key: BREVO_WEBHOOK_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+services:
+  - type: web
+    name: email-automation-web
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    buildCommand: npm run render:build:web
+    startCommand: npm run start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - fromGroup: email-automation-shared
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # Heavy jobs belong to the worker service, never the request path.
+      - key: RUN_WORKERS
+        value: "false"
+      - key: SERVE_CLIENT
+        value: "true"
+      # Same-origin deploy, so 'lax' is correct and also lets the Gmail OAuth
+      # return redirect carry the session cookie.
+      - key: COOKIE_SAMESITE
+        value: lax
+      # CLIENT_URL / API_URL / GOOGLE_REDIRECT_URI are intentionally omitted: the app
+      # derives all three from RENDER_EXTERNAL_URL, which Render injects with the https
+      # scheme included. Override them only for a custom domain.
+
+  - type: worker
+    name: email-automation-worker
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    # No client build here - the worker never serves HTTP.
+    buildCommand: npm run render:build:worker
+    startCommand: npm run start:worker
+    autoDeploy: true
+    envVars:
+      - fromGroup: email-automation-shared
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: RUN_WORKERS
+        value: "true"
+      - key: SERVE_CLIENT
+        value: "false"
+      # A worker has no external URL of its own, so links inside outbound emails
+      # need the web service's public address explicitly.
+      - key: CLIENT_URL
+        sync: false # set to your web service URL, e.g. https://email-automation-web.onrender.com

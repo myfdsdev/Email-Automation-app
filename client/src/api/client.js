@@ -1,8 +1,15 @@
 import axios from 'axios';
 import { useAuthStore } from '@/stores/authStore';
 
+// Same-origin by default: in production the API serves this build, and in dev Vite
+// proxies /api to it. Set VITE_API_URL only when the API lives on another domain
+// (that also requires COOKIE_SAMESITE=none on the server).
+const baseURL = import.meta.env.VITE_API_URL
+  ? `${String(import.meta.env.VITE_API_URL).replace(/\/+$/, '')}/api`
+  : '/api';
+
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL,
   withCredentials: true,
   timeout: 60000,
 });

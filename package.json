@@ -3,8 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "description": "Email Automation - MERN SaaS for Gmail + Brevo outreach, sequences and reply intelligence",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "install:all": "npm install --prefix server && npm install --prefix client",
+
+    "//render": "Render sets NODE_ENV=production, which makes npm ci omit devDependencies. Vite is a devDependency, so the client install must force --include=dev or the build fails.",
+    "render:build:web": "npm ci --omit=dev --prefix server && npm ci --include=dev --prefix client && npm run build --prefix client",
+    "render:build:worker": "npm ci --omit=dev --prefix server",
+
     "dev": "concurrently -n server,client,worker -c blue,green,magenta \"npm run dev --prefix server\" \"npm run dev --prefix client\" \"npm run dev:worker --prefix server\"",
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
