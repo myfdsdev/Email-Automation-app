@@ -9,9 +9,12 @@
   "scripts": {
     "install:all": "npm install --prefix server && npm install --prefix client",
 
-    "//render": "Render sets NODE_ENV=production, which makes npm ci omit devDependencies. Vite is a devDependency, so the client install must force --include=dev or the build fails.",
-    "render:build:web": "npm ci --omit=dev --prefix server && npm ci --include=dev --prefix client && npm run build --prefix client",
+    "//render": "Render sets NODE_ENV=production, which makes npm ci omit devDependencies. Vite is a devDependency, so any client install must force --include=dev or the build fails with 'vite: not found'.",
+    "render:build:client": "npm ci --include=dev --prefix client && npm run build --prefix client",
+    "render:build:api": "npm ci --omit=dev --prefix server",
     "render:build:worker": "npm ci --omit=dev --prefix server",
+    "//render:same-origin": "Use this build command instead if you collapse to a single service that serves the SPA itself (SERVE_CLIENT=true, no static site).",
+    "render:build:web": "npm ci --omit=dev --prefix server && npm ci --include=dev --prefix client && npm run build --prefix client",
     "db:indexes": "npm run db:indexes --prefix server",
 
     "dev": "concurrently -n server,client,worker -c blue,green,magenta \"npm run dev --prefix server\" \"npm run dev --prefix client\" \"npm run dev:worker --prefix server\"",

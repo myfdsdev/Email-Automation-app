@@ -1,9 +1,20 @@
 # Render Blueprint - Email Automation
 # Deploy: Render Dashboard -> New -> Blueprint -> pick this repo.
 #
-# Topology
-#   web    : Express API + the built React SPA on one origin (no CORS, no cross-site cookies)
+# Topology (split: static frontend + API on separate origins)
+#   client : Render Static Site serving the built React SPA
+#   web    : Express API only
 #   worker : BullMQ background processor (sending, sequences, Gmail sync, webhooks)
+#
+# Because the client and API are on different domains, every API call is cross-site.
+# That forces two things, and the setup silently breaks without either:
+#   1. COOKIE_SAMESITE=none on the API  - browsers drop a SameSite=Lax cookie
+#      cross-site, so login would appear to succeed and then bounce back to /login.
+#   2. CLIENT_URL on the API set to the static site origin, so CORS admits it.
+#
+# A single same-origin web service (SERVE_CLIENT=true, no static site) avoids both and
+# does not depend on third-party cookies, which browsers are actively restricting.
+# See DEPLOYMENT.md if you want to collapse this back to one service.
 #
 # Datastores are managed and live outside this blueprint:
 #   MONGODB_URI -> MongoDB Atlas
@@ -66,13 +77,37 @@ envVarGroups:
         sync: false
 
 services:
+  # ---------------------------------------------------------------- client (SPA)
+  - type: web
+    name: email-automation-client
+    runtime: static
+    branch: main
+    buildCommand: npm run render:build:client
+    staticPublishPath: ./client/dist
+    autoDeploy: true
+    # Without this rewrite the static host looks for a real file at /dashboard and
+    # returns 404 on deep links and refreshes. Every SPA path must serve index.html.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Baked into the bundle at BUILD time (Vite inlines VITE_* as constants), so
+      # changing this needs a rebuild, not a restart. Must be the API's origin with
+      # scheme and no trailing slash, e.g. https://email-automation-app-zp54.onrender.com
+      - key: VITE_API_URL
+        sync: false
+
+  # ---------------------------------------------------------------- API
   - type: web
     name: email-automation-web
     runtime: node
     plan: starter
     region: oregon
     branch: main
-    buildCommand: npm run render:build:web
+    buildCommand: npm run render:build:api
     # Builds the schema indexes before the new version takes traffic. Required because
     # autoIndex is off in production, and this schema uses unique indexes to enforce
     # correctness (duplicate-send prevention, per-workspace contact uniqueness).
@@ -89,15 +124,21 @@ services:
       # Heavy jobs belong to the worker service, never the request path.
       - key: RUN_WORKERS
         value: "false"
+      # The static site serves the SPA, so the API must not.
       - key: SERVE_CLIENT
-        value: "true"
-      # Same-origin deploy, so 'lax' is correct and also lets the Gmail OAuth
-      # return redirect carry the session cookie.
+        value: "false"
+      # REQUIRED for the split. The client is on another domain, so the session cookie
+      # is cross-site; browsers only send those when SameSite=None (and Secure, which
+      # Render's HTTPS satisfies). With the default 'lax' the cookie is silently
+      # dropped: login returns 200, the next call 401s, and the app loops to /login.
       - key: COOKIE_SAMESITE
-        value: lax
-      # CLIENT_URL / API_URL / GOOGLE_REDIRECT_URI are intentionally omitted: the app
-      # derives all three from RENDER_EXTERNAL_URL, which Render injects with the https
-      # scheme included. Override them only for a custom domain.
+        value: none
+      # REQUIRED for the split: puts the static site's origin in the CORS allowlist.
+      # Set to the client URL, e.g. https://email-automation-app-1.onrender.com
+      - key: CLIENT_URL
+        sync: false
+      # API_URL / GOOGLE_REDIRECT_URI are derived from RENDER_EXTERNAL_URL, which
+      # Render injects with the https scheme. Override only for a custom domain.
 
   - type: worker
     name: email-automation-worker
