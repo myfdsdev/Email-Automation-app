@@ -9,7 +9,9 @@
     "start": "node server.js",
     "dev:worker": "node --watch ../worker/worker.js",
     "start:worker": "node ../worker/worker.js",
-    "db:indexes": "node scripts/syncIndexes.js"
+    "db:indexes": "node scripts/syncIndexes.js",
+    "//render-build": "Render Root Directory is server/, so the build command runs here. This one script installs server + client deps and builds the SPA into ../client/dist, which app.js serves. --include=dev is required because Render sets NODE_ENV=production and Vite is a devDependency.",
+    "render:build": "npm ci && npm ci --include=dev --prefix ../client && npm run build --prefix ../client"
   },
   "dependencies": {
     "axios": "^1.7.9",
