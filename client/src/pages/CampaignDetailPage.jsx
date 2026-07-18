@@ -42,13 +42,9 @@ export default function CampaignDetailPage() {
     onError: (err) => toast.error(err.message),
   });
 
-  const c = campaignQ.data?.campaign;
-  if (campaignQ.isLoading) return <FullPageSpinner label="Loading campaign…" />;
-  if (!c) return <Page><EmptyState title="Campaign not found" action={<Button asChild><Link to="/campaigns">Back to campaigns</Link></Button>} /></Page>;
-
-  const rates = reportQ.data?.rates;
-  const denom = c.stats?.queued || c.stats?.recipients || 0;
-
+  // Every hook must run on every render: keep this above the early returns below,
+  // or the loading→loaded transition changes the hook count and React throws
+  // "Rendered more hooks than during the previous render" — blanking the whole app.
   const timelineData = React.useMemo(() => {
     const rows = reportQ.data?.timeline || [];
     const byDay = {};
@@ -58,6 +54,13 @@ export default function CampaignDetailPage() {
     });
     return Object.values(byDay);
   }, [reportQ.data]);
+
+  const c = campaignQ.data?.campaign;
+  if (campaignQ.isLoading) return <FullPageSpinner label="Loading campaign…" />;
+  if (!c) return <Page><EmptyState title="Campaign not found" action={<Button asChild><Link to="/campaigns">Back to campaigns</Link></Button>} /></Page>;
+
+  const rates = reportQ.data?.rates;
+  const denom = c.stats?.queued || c.stats?.recipients || 0;
 
   return (
     <Page>
